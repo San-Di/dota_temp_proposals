@@ -1,0 +1,23 @@
+{
+    "natural":0,
+    "ego: lateral":1,
+    "ego: leave_to_left":2,
+    "ego: leave_to_right":3,
+    "ego: moving_ahead_or_waiting":4,
+    "ego: obstacle":5,
+    "ego: oncoming":6,
+    "ego: pedestrian":7,
+    "ego: start_stop_or_stationary":8,
+    "ego: turning":9,
+    "ego: unknown":10,
+    "other: lateral":11,
+    "other: leave_to_left":12,
+    "other: leave_to_right":13,
+    "other: moving_ahead_or_waiting":14,
+    "other: obstacle":15,
+    "other: oncoming":16,
+    "other: pedestrian":17,
+    "other: start_stop_or_stationary":18,
+    "other: turning":19,
+    "other: unknown":20
+ }
