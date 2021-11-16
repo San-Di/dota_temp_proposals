@@ -45,6 +45,7 @@ torch.cuda.manual_seed_all(seed)
 
 meta_data_path = os.path.join(BASE_DIR, 'Detection-of-Traffic-Anomaly/dataset/metadata_train.json')
 frames_path = os.path.join(BASE_DIR, 'Detection-of-Traffic-Anomaly/dataset/frames/')
+feats_path = os.path.join(BASE_DIR,'Detection-of-Traffic-Anomaly/dataset/features_self/')
 print("Meta > {} \t frames > {} ".format(meta_data_path, frames_path))
 slide_window_size = 480
 kernel_list = [1, 2, 3, 4, 5, 7, 9, 11, 15, 21, 29, 41, 57, 71, 111, 161, 211, 251]
@@ -76,7 +77,10 @@ def get_dataset():
     load_samplelist=False, sample_listpath=None)
     '''
     # Create the dataset and data loader instance
-    train_dataset = DoTADataset(meta_data, frames_path, slide_window_size, kernel_list,
+    train_dataset = DoTADataset(meta_data, frames_path,
+                        feats_path,
+                        slide_window_size,
+                        kernel_list,
                         classes,
                         pos_thresh,
                         neg_thresh,
