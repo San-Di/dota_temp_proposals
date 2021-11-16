@@ -85,16 +85,16 @@ class DoTADataset(Dataset):
             if r is not None:
                 vid_counter += 1
                 video_id, total_frame, pos_seg, neg_seg = r
-                # missing_prop += is_missing
+                
                 npos_seg = 0
                 for k in pos_seg:
                     # all neg_segs are the same, since they need to be negative
                     # for all samples
                     all_segs = pos_seg[k]
-                    sent = all_segs[0][-1] #[s[-1] for s in all_segs]
-                    other = [s[:-1] for s in all_segs]
+                    anno_class = all_segs[0][-1] #[s[-1] for s in all_segs]
+                    positive_offsets = [s[:-1] for s in all_segs]
                     self.sample_list.append(
-                        (video_id, other, sent, neg_seg, total_frame))
+                        (video_id, positive_offsets, anno_class, neg_seg, total_frame))
                     npos_seg += len(pos_seg[k])
 
                 pos_anchor_stats.append(npos_seg)
@@ -125,38 +125,38 @@ class DoTADataset(Dataset):
 def _get_pos_neg_exp(vid, segment_video, slide_window_size, anc_len_all, anc_cen_all, pos_thresh, neg_thresh):
     
     
+    neg_overlap = [0] * anc_len_all.shape[0]
+    pos_collected = [False] * anc_len_all.shape[0]
+    pos_seg = defaultdict(list)
+
     vgg_feats = torch.from_numpy(np.load(vid + '.npy')).float()
     total_frame = vgg_feats.size(0)
     if total_frame != segment_video[:, 0]:
         print("Here**** \n feat_size {} \t seg_frame {}".format(total_frame, segment_video[:, 0]))
-        
     window_start = 0
     window_end = slide_window_size
     window_start_t = window_start
     window_end_t = window_end
-    pos_seg = defaultdict(list)
-    neg_overlap = [0] * anc_len_all.shape[0]
-    pos_collected = [False] * anc_len_all.shape[0]
+    print("====== Vid {} ======".format(vid))
     for j in range(anc_len_all.shape[0]):
         potential_match = []
         gt_start = segment_video[0][1]
         gt_end = segment_video[0][2]
-        print("GT start: {} \t end {}".format(gt_start, gt_end))
+        print("J > {} >>> GT start: {} \t end {} anc_center {} anc_lenght {}".format(j,gt_start, gt_end, anc_cen_all[j], anc_len_all[j]))
         if gt_start > gt_end:
             gt_start, gt_end = gt_end, gt_start
         if anc_cen_all[j] + anc_len_all[j] / 2. <= total_frame:
-            if window_start_t <= gt_start and window_end_t * 2 >= gt_end:
+            if window_start_t <= gt_start and window_end_t >= gt_end:
+                
                 overlap = segment_iou(np.array([gt_start, gt_end]), np.array([[
                     anc_cen_all[j] - anc_len_all[j] / 2.,
                     anc_cen_all[j] + anc_len_all[j] / 2.]]))
-
+                print("overlap ",overlap)
                 neg_overlap[j] = max(overlap, neg_overlap[j])
 
                 if not pos_collected[j] and overlap >= pos_thresh:
-                    len_offset = math.log(
-                        (gt_end - gt_start) / anc_len_all[j])
-                    cen_offset = ((gt_end + gt_start) / 2. -
-                                    anc_cen_all[j]) / anc_len_all[j]
+                    len_offset = math.log((gt_end - gt_start) / anc_len_all[j])
+                    cen_offset = ((gt_end + gt_start) / 2. - anc_cen_all[j]) / anc_len_all[j]
                     potential_match.append(
                         (j, overlap, len_offset, cen_offset,
                             segment_video[0][3]))

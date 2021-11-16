@@ -69,7 +69,9 @@ def get_dataset():
 
     # Process classes
     meta_data = json.load(open(meta_data_path))
-    classes = generate_classes(meta_data)
+    # classes = generate_classes(meta_data)
+    classes = json.load(open(os.path.join(ROOT_DIR, 'scripts/classes.json')))
+    print(classes)
     '''
     (self, meta_data_path, frames_path, 
     slide_window_size, kernel_list, classes,
@@ -103,4 +105,5 @@ def get_dataset():
     return train_loader, train_sampler, classes
 
 if __name__ == "__main__":
-    train_loader, sampler, classes  = get_dataset()
+    # train_loader, sampler, classes  = get_dataset()
+    get_dataset()
