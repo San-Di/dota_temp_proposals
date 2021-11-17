@@ -73,7 +73,6 @@ class DoTADataset(Dataset):
                 if vid in video_list:
                     segement_video = np.array(segment_data[vid])
                     vid = os.path.join(feats_path, vid)
-                    print("Vid> ", vid)
                     results[vid_idx] = pool.apply_async(_get_pos_neg_exp,(vid, segement_video, slide_window_size, anc_len_all, anc_cen_all, pos_thresh, neg_thresh))
                     vid_idx += 1
             results = results[:vid_idx]
@@ -85,19 +84,20 @@ class DoTADataset(Dataset):
             if r is not None:
                 vid_counter += 1
                 video_id, total_frame, pos_seg, neg_seg = r
-                
-                npos_seg = 0
-                for k in pos_seg:
-                    # all neg_segs are the same, since they need to be negative
-                    # for all samples
-                    all_segs = pos_seg[k]
-                    anno_class = all_segs[0][-1] #[s[-1] for s in all_segs]
-                    positive_offsets = [s[:-1] for s in all_segs]
-                    self.sample_list.append(
-                        (video_id, positive_offsets, anno_class, neg_seg, total_frame))
-                    npos_seg += len(pos_seg[k])
+                print("Postivit segment > ", np.array(pos_seg).shape)
 
-                pos_anchor_stats.append(npos_seg)
+                anno_class = pos_seg[0][-1]
+                positive_offsets = [[*off[:-1]] for off in pos_seg]
+                self.sample_list.append((video_id, positive_offsets, anno_class, neg_seg, total_frame))
+                # for seg in pos_seg:
+                #     # all neg_segs are the same, since they need to be negative
+                #     # for all samples
+                #     anno_class = seg[-1] #[s[-1] for s in all_segs]
+                #     positive_offsets = [off for off in seg[:-1]]
+                #     self.sample_list.append(
+                #         (video_id, positive_offsets, anno_class, neg_seg, total_frame))
+
+                pos_anchor_stats.append(len(pos_seg))
                 neg_anchor_stats.append(len(neg_seg))
 
         print('total number of {} videos: '.format(vid_counter))
@@ -116,10 +116,7 @@ class DoTADataset(Dataset):
     def __getitem__(self, index):
         video_id, pos_seg, ann_class_id, neg_seg, total_frame = self.sample_list[index]
         vgg_feats = torch.from_numpy(np.load(video_id + '.npy')).float()
-        img_feat = torch.FloatTensor(np.zeros((self.slide_window_size, vgg_feats.size(1))))
-        torch.cat((vgg_feats), dim=1, out=img_feat[:min(total_frame, self.slide_window_size)])
-
-        return (pos_seg, ann_class_id, neg_seg, img_feat)
+        return (pos_seg, ann_class_id, neg_seg, vgg_feats)
 
 
 def _get_pos_neg_exp(vid, segment_video, slide_window_size, anc_len_all, anc_cen_all, pos_thresh, neg_thresh):
@@ -127,22 +124,22 @@ def _get_pos_neg_exp(vid, segment_video, slide_window_size, anc_len_all, anc_cen
     
     neg_overlap = [0] * anc_len_all.shape[0]
     pos_collected = [False] * anc_len_all.shape[0]
-    pos_seg = defaultdict(list)
+    pos_seg = []
 
     vgg_feats = torch.from_numpy(np.load(vid + '.npy')).float()
     total_frame = vgg_feats.size(0)
-    if total_frame != segment_video[:, 0]:
-        print("Here**** \n feat_size {} \t seg_frame {}".format(total_frame, segment_video[:, 0]))
+    # if total_frame != segment_video[:, 0]:
+        # print("Here**** \n feat_size {} \t seg_frame {}".format(total_frame, segment_video[:, 0]))
     window_start = 0
     window_end = slide_window_size
     window_start_t = window_start
     window_end_t = window_end
-    print("====== Vid {} ======".format(vid))
+    
     for j in range(anc_len_all.shape[0]):
         potential_match = []
         gt_start = segment_video[0][1]
         gt_end = segment_video[0][2]
-        print("J > {} >>> GT start: {} \t end {} anc_center {} anc_lenght {}".format(j,gt_start, gt_end, anc_cen_all[j], anc_len_all[j]))
+        # print("J > {} >>> GT start: {} \t end {} anc_center {} anc_lenght {}".format(j,gt_start, gt_end, anc_cen_all[j], anc_len_all[j]))
         if gt_start > gt_end:
             gt_start, gt_end = gt_end, gt_start
         if anc_cen_all[j] + anc_len_all[j] / 2. <= total_frame:
@@ -151,42 +148,34 @@ def _get_pos_neg_exp(vid, segment_video, slide_window_size, anc_len_all, anc_cen
                 overlap = segment_iou(np.array([gt_start, gt_end]), np.array([[
                     anc_cen_all[j] - anc_len_all[j] / 2.,
                     anc_cen_all[j] + anc_len_all[j] / 2.]]))
-                print("overlap ",overlap)
+                    
                 neg_overlap[j] = max(overlap, neg_overlap[j])
 
                 if not pos_collected[j] and overlap >= pos_thresh:
                     len_offset = math.log((gt_end - gt_start) / anc_len_all[j])
                     cen_offset = ((gt_end + gt_start) / 2. - anc_cen_all[j]) / anc_len_all[j]
-                    potential_match.append(
-                        (j, overlap, len_offset, cen_offset,
-                            segment_video[0][3]))
+                    potential_match.append((j, overlap, len_offset, cen_offset, segment_video[0][3]))
                     pos_collected[j] = True
 
+        # print("potential match > ", np.array(potential_match).shape)
         filled = False
         for item in potential_match:
-            if item[0] not in pos_seg:
-                filled = True
-                pos_seg[item[0]].append(tuple(item[1:]))
-                break
+            pos_seg.append(tuple(item))
+            break
 
         if not filled and len(potential_match)>0:
             # randomly choose one
             shuffle(potential_match)
             item = potential_match[0]
-            pos_seg[item[0]].append(tuple(item[1:]))
+            pos_seg.append(tuple(item))
 
     neg_seg = []
     for oi, overlap in enumerate(neg_overlap):
         if overlap < neg_thresh:
             neg_seg.append((oi, overlap))
 
-    npos_seg = 0
-    for k in pos_seg:
-        npos_seg += len(pos_seg[k])
-
     print(
-        'pos anc: {}, neg anc: {}'.format(npos_seg,
-                                            len(neg_seg)))
+        'pos anc: {}, neg anc: {}'.format(len(pos_seg), len(neg_seg)))
 
     return vid, total_frame, pos_seg, neg_seg
     
@@ -218,7 +207,54 @@ def generate_segment_exp(data, classes, frames_dir):
         segment[vid].sort(key=lambda x: x[0])
 
     return segment
-            
+
+def dota_collate_fn(batch_lst):
+    sample_each = 10  # TODO, hard coded
+    pos_seg, anno_class, neg_seg, img_feat = batch_lst[0]
+
+    batch_size = len(batch_lst)
+
+    anno_class_batch = torch.LongTensor(np.ones((batch_size, 1),dtype='int64'))
+
+    tempo_seg_pos = torch.FloatTensor(np.zeros((batch_size, sample_each, 4)))
+    tempo_seg_neg = torch.FloatTensor(np.zeros((batch_size, sample_each, 2)))
+    for batch_idx in range(batch_size):
+ 
+        pos_seg, anno_class, neg_seg, img_feat = batch_lst[batch_idx]
+        img_batch = torch.FloatTensor(np.zeros((batch_size,
+                                img_feat.size(0),
+                                img_feat.size(1))))
+
+        img_batch[batch_idx,:] = img_feat
+
+        pos_seg_tensor = torch.FloatTensor(pos_seg)
+        neg_seg_tensor = torch.FloatTensor(neg_seg)
+        anno_class_batch[batch_idx] = anno_class
+        
+        # sample positive anchors
+        perm_idx = torch.randperm(len(pos_seg))
+        
+        if len(pos_seg) >= sample_each:
+            tempo_seg_pos[batch_idx,:,:] = pos_seg_tensor[perm_idx[:sample_each]]
+
+        else:
+            tempo_seg_pos[batch_idx,:len(pos_seg),:] = pos_seg_tensor
+            idx = torch.multinomial(torch.ones(len(pos_seg)), sample_each-len(pos_seg), True)
+            tempo_seg_pos[batch_idx,len(pos_seg):,:] = pos_seg_tensor[idx]
+
+        # sample negative anchors
+        # neg_seg_tensor = torch.FloatTensor(neg_seg)
+        perm_idx = torch.randperm(len(neg_seg))
+        if len(neg_seg) >= sample_each:
+            tempo_seg_neg[batch_idx, :, :] = neg_seg_tensor[perm_idx[:sample_each]]
+        else:
+            tempo_seg_neg[batch_idx, :len(neg_seg), :] = neg_seg_tensor
+            idx = torch.multinomial(torch.ones(len(neg_seg)),
+                                    sample_each - len(neg_seg),True)
+            tempo_seg_neg[batch_idx, len(neg_seg):, :] = neg_seg_tensor[idx]
+
+    return (img_batch, tempo_seg_pos, tempo_seg_neg, anno_class_batch)
+     
 '''
     "video_id" : 1
     "video_start": 502,

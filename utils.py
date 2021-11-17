@@ -5,7 +5,7 @@ import urllib.request
 import numpy as np
 
 def segment_iou(target_segment, candidate_segments):
-    print("GT> {} , proposal > {}".format(target_segment, candidate_segments))
+    # print("GT> {} , proposal > {}".format(target_segment, candidate_segments))
     """Compute the temporal intersection over union between a
     target segment and all the test segments.
 

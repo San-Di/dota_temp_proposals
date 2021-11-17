@@ -1,3 +1,0 @@
-features : useful for both prefix path and vide name
-frames : not really useful
-meta : only video names

@@ -32,7 +32,7 @@ ROOT_DIR = os.path.abspath('./')
 sys.path.append(ROOT_DIR)
 print(os.path.abspath(os.getcwd()))
 
-from dataset.dota_exp_dataset import DoTADataset, generate_classes
+from dataset.dota_exp_dataset import DoTADataset, generate_classes, dota_collate_fn
 
 seed = 213
 
@@ -45,9 +45,9 @@ torch.cuda.manual_seed_all(seed)
 
 meta_data_path = os.path.join(BASE_DIR, 'Detection-of-Traffic-Anomaly/dataset/metadata_train.json')
 frames_path = os.path.join(BASE_DIR, 'Detection-of-Traffic-Anomaly/dataset/frames/')
-feats_path = os.path.join(BASE_DIR,'Detection-of-Traffic-Anomaly/dataset/features_self/')
-print("Meta > {} \t frames > {} ".format(meta_data_path, frames_path))
-slide_window_size = 480
+feats_path = os.path.join(BASE_DIR,'Detection-of-Traffic-Anomaly/dataset/features_self/') 
+
+slide_window_size = 280
 kernel_list = [1, 2, 3, 4, 5, 7, 9, 11, 15, 21, 29, 41, 57, 71, 111, 161, 211, 251]
 pos_thresh = 0.7
 neg_thresh = 0.3
@@ -58,7 +58,7 @@ sample_listpath = None
 
 # ------ x ------ x ------
 
-batch_size = 32
+batch_size = 3
 num_workers = 8
 world_size = 2
 dist_url = '../dataset/dist_file' # non exist url for distributed url
@@ -99,10 +99,10 @@ def get_dataset():
                               batch_size=batch_size,
                               shuffle=(train_sampler is None), sampler=train_sampler,
                               num_workers=num_workers,
+                              collate_fn=dota_collate_fn
                               )
-    train_features, train_labels = next(iter(train_loader))
-    print("Trainfeat> ",train_features)
-    return train_loader, train_sampler, classes
+
+    return train_loader
 
 if __name__ == "__main__":
     # train_loader, sampler, classes  = get_dataset()
