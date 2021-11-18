@@ -63,8 +63,7 @@ class DoTADataset(Dataset):
         pos_anchor_stats = []
         neg_anchor_stats = []
         # load annotation per video and construct training set
-        missing_prop = 0
-        print("Here *******************88")
+        
         with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
             results = [None]*len(meta_data)
             vid_idx = 0
@@ -89,14 +88,7 @@ class DoTADataset(Dataset):
                 anno_class = pos_seg[0][-1]
                 positive_offsets = [[*off[:-1]] for off in pos_seg]
                 self.sample_list.append((video_id, positive_offsets, anno_class, neg_seg, total_frame))
-                # for seg in pos_seg:
-                #     # all neg_segs are the same, since they need to be negative
-                #     # for all samples
-                #     anno_class = seg[-1] #[s[-1] for s in all_segs]
-                #     positive_offsets = [off for off in seg[:-1]]
-                #     self.sample_list.append(
-                #         (video_id, positive_offsets, anno_class, neg_seg, total_frame))
-
+                
                 pos_anchor_stats.append(len(pos_seg))
                 neg_anchor_stats.append(len(neg_seg))
 
